@@ -1,0 +1,121 @@
+PART ONE OF HIVE ASSIGNMENT
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+1. Create an internal table for the Patent data set. 
+(Make sure not to include the header row)
+````````````````````````````````````````````````````
+
+
+
+drop table if exists temp_demoData;
+CREATE TABLE temp_demoData (col_value STRING) TBLPROPERTIES ("skip.header.line.count"="1");
+
+LOAD DATA INPATH '/user/maria_dev/SBA1/apat63_99.txt' OVERWRITE INTO TABLE temp_demoData;
+
+
+
+
+drop table if exists data_patent;
+CREATE TABLE data_patent (patent INT, gyear INT, gdate INT, appyear INT, country STRING, postate STRING,
+				 assignee INT, asscode INT, claims INT, nclass INT, cat INT, subcat INT, cmade INT, creceive INT,
+				 ratiocit INT, general INT, original INT, fwdaplag INT, bckgtlag INT, selfctub INT, selfctlb INT,
+				 secdupbd INT, secdlwbd INT);
+
+
+
+
+
+insert overwrite table data_patent
+
+SELECT  
+regexp_extract(col_value, '^(?:([^,]*),?){1}', 1) patent,  
+regexp_extract(col_value, '^(?:([^,]*),?){2}', 1) gyear,  
+regexp_extract(col_value, '^(?:([^,]*),?){3}', 1) gdate,  
+regexp_extract(col_value, '^(?:([^,]*),?){4}', 1) appyear,  
+regexp_replace(regexp_extract(col_value, '^(?:([^,]*),?){5}', 1),'"*','') country, 
+regexp_replace(regexp_extract(col_value, '^(?:([^,]*),?){6}', 1),'"*','') postate,
+regexp_extract(col_value, '^(?:([^,]*),?){7}', 1) assignee,  
+regexp_extract(col_value, '^(?:([^,]*),?){8}', 1) asscode,  
+regexp_extract(col_value, '^(?:([^,]*),?){9}', 1) claims,  
+regexp_extract(col_value, '^(?:([^,]*),?){10}', 1) nclass,  
+regexp_extract(col_value, '^(?:([^,]*),?){11}', 1) cat,  
+regexp_extract(col_value, '^(?:([^,]*),?){12}', 1) subcat,
+regexp_extract(col_value, '^(?:([^,]*),?){13}', 1) cmade,  
+regexp_extract(col_value, '^(?:([^,]*),?){14}', 1) creceive,  
+regexp_extract(col_value, '^(?:([^,]*),?){15}', 1) ratiocit,  
+regexp_extract(col_value, '^(?:([^,]*),?){16}', 1) general,  
+regexp_extract(col_value, '^(?:([^,]*),?){17}', 1) original,  
+regexp_extract(col_value, '^(?:([^,]*),?){18}', 1) fwdaplag,
+regexp_extract(col_value, '^(?:([^,]*),?){19}', 1) bckgtlag,  
+regexp_extract(col_value, '^(?:([^,]*),?){20}', 1) selfctub,  
+regexp_extract(col_value, '^(?:([^,]*),?){21}', 1) selfctlb,  
+regexp_extract(col_value, '^(?:([^,]*),?){22}', 1) secdupbd,  
+regexp_extract(col_value, '^(?:([^,]*),?){23}', 1) secdlwbd
+
+
+from temp_demodata;
+
+
+
+
+2. Create an external table with dynamic partitioning for Patent data set so that it can be used efficiently for queries which require looking into
+   patents granted for a given year. (Use data from previous table and partition by Grant Year)
+```````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````` 
+
+
+SET hive.exec.dynamic.partition=true;
+SET hive.exec.dynamic.partition.mode=nonstrict;
+
+
+CREATE EXTERNAL TABLE dataPatent_dynamic_p (patent INT, gdate INT, appyear INT, country STRING, postate STRING,
+				 assignee INT, asscode INT, claims INT, nclass INT, cat INT, subcat INT, cmade INT, creceive INT,
+				 ratiocit INT, general INT, original INT, fwdaplag INT, bckgtlag INT, selfctub INT, selfctlb INT,
+				 secdupbd INT, secdlwbd INT)
+PARTITIONED BY (gyear INT)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+ESCAPED BY '"' LINES TERMINATED BY '\n'
+location "/user/maria_dev/SBA1";
+
+
+
+INSERT OVERWRITE TABLE dataPatent_dynamic_p
+PARTITION (gyear)
+SELECT patent, gdate, appyear, country, postate, assignee, asscode, claims, nclass, cat, subcat, cmade, creceive, ratiocit, general, 
+       original, fwdaplag, bckgtlag, selfctub, selfctlb, secdupbd, secdlwbd, gyear 
+FROM data_patent;
+
+
+
+
+
+QUERIES
+~~~~~~~
+
+
+1.Find out the number of patents granted in the year 1963.
+``````````````````````````````````````````````````````````
+
+
+SELECT COUNT(patent)
+FROM dataPatent_dynamic_p 
+WHERE gyear = 1963;
+
+
+
+
+
+2.Find out the number of patents granted in each country in the year 1999.
+``````````````````````````````````````````````````````````````````````````
+
+
+
+SELECT count(patent), country
+FROM dataPatent_dynamic_p
+WHERE gyear = 1999
+GROUP BY country;
+
+
+
+
+
+

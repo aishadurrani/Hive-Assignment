@@ -1,0 +1,171 @@
+
+PART TWO OF HIVE ASSIGNMENT
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+1.Create an external table for NASDAQ daily prices data set.
+````````````````````````````````````````````````````````````
+
+
+
+drop table if exists daily_prices_temp;
+
+CREATE EXTERNAL TABLE daily_prices_temp (stock_exchange STRING, stock_symbol STRING, stock_date STRING, stock_price_open FLOAT, stock_price_high FLOAT, stock_price_low FLOAT, stock_price_close FLOAT, stock_volume INT, stock_price_adj_close FLOAT)
+
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+ESCAPED BY '"' LINES TERMINATED BY '\n'
+location "/user/maria_dev/daily_prices";
+
+
+LOAD DATA INPATH '/user/maria_dev/SBA2/daily_prices.csv' OVERWRITE INTO TABLE daily_prices;
+
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+drop table if exists daily_prices;
+CREATE EXTERNAL TABLE daily_prices (stock_exchange STRING, stock_date STRING, stock_price_open FLOAT, stock_price_high FLOAT,
+				    stock_price_low FLOAT, stock_price_close FLOAT, stock_volume INT, stock_price_adj_close FLOAT)
+PARTITIONED BY (stock_symbol STRING)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+ESCAPED BY '"' LINES TERMINATED BY '\n'
+location "/user/maria_dev/daily_prices";
+
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+SET hive.exec.dynamic.partition=true;
+SET hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE daily_prices
+PARTITION (stock_symbol)
+Select stock_exchange ,
+	   stock_date,
+	   stock_price_open,   
+	   stock_price_high,
+	   stock_price_low,
+	   stock_price_close,
+	   stock_volume, 
+	   stock_price_adj_close, 
+	   stock_symbol
+from daily_prices_temp;
+
+
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+
+
+
+2.Create an external table for NASDAQ dividends data set.
+`````````````````````````````````````````````````````````
+
+
+drop table if exists dividends_data_temp;
+CREATE EXTERNAL TABLE dividends_data_temp (stock_exchange STRING, stock_symbol STRING, stock_date STRING, dividends FLOAT)
+
+
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+ESCAPED BY '"' LINES TERMINATED BY '\n'
+location "/user/maria_dev/dividends"
+TBLPROPERTIES ("skip.header.line.count"="1");
+
+
+LOAD DATA INPATH '/user/maria_dev/SBA2/dividends.csv' OVERWRITE INTO TABLE dividends_data_temp;
+
+
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+
+CREATE EXTERNAL TABLE dividends_data (stock_exchange STRING, stock_date STRING, dividends FLOAT)
+
+PARTITIONED BY (stock_symbol STRING)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+ESCAPED BY '"' LINES TERMINATED BY '\n'
+location "/user/maria_dev/dividends";
+
+
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+
+SET hive.exec.dynamic.partition=true;
+SET hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE dividends_data
+PARTITION (stock_symbol)
+Select stock_exchange,
+       stock_date,
+       dividends,
+       stock_symbol
+from dividends_data_temp;
+
+drop table dividends_data_temp;
+
+
+
+
+
+QUERIES
+~~~~~~~~
+
+
+
+3.Find out total volume sale for each stock symbol which has a closing price more than $5.
+``````````````````````````````````````````````````````````````````````````````````````````
+
+
+SELECT stock_symbol, SUM(stock_volume)
+FROM daily_prices 
+WHERE stock_price_close > 5
+GROUP BY stock_symbol;
+
+
+
+
+4.Find out the highest price in the history for each stock symbol.
+``````````````````````````````````````````````````````````````````
+
+
+SELECT MAX(stock_price_high), stock_symbol
+FROM daily_prices
+GROUP BY stock_symbol;
+
+
+
+
+5.Find out highest dividends given for each stock symbol in entire history.
+```````````````````````````````````````````````````````````````````````````
+
+
+SELECT MAX(dividends), stock_symbol
+FROM dividends_data
+GROUP BY stock_symbol;
+
+
+
+
+6.Find out the highest price and highest dividends for each stock symbol if the highest price and highest dividends exist.
+``````````````````````````````````````````````````````````````````````````````````````````````````````````````````````````
+
+
+SELECT MAX(daily_prices.stock_price_high), MAX(dividends_data.dividends), stock_symbol
+FROM dividends_data
+JOIN daily_prices 
+ON daily_prices.stock_symbol = dividends_data.stock_symbol
+GROUP BY stock_symbol;
+
+
+
